@@ -113,6 +113,11 @@
             100% { transform: translateY(-1000px) rotate(720deg); }
         }
     </style>
+
+<script>
+    document.getElementById('year').textContent = new Date().getFullYear();
+</script>
+    
 </head>
 <body>
     <div class="floating-elements">
@@ -149,5 +154,22 @@
             <a href="mailto:h.tanim@outlook.com" class="social-link">💼</a>
         </div>
     </div>
+    <div class="footer">
+<footer style="
+    position: fixed;
+    bottom: 0;
+    width: 100%;
+    text-align: center;
+    padding: 15px 0;
+    background: rgba(255,255,255,0.8);
+    font-family: 'Poppins', sans-serif;
+    color: #2c3e50;
+    font-size: 0.9rem;
+    border-top: 1px solid rgba(0,0,0,0.1);
+">
+    &copy; <span id="year">2025</span> Tanim Hossain. All rights reserved.
+</footer>
+    </div>
+    
 </body>
 </html>
