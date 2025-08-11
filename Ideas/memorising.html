@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+
+<!--Tanim Hossain -->
+
+  
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Memorising Slideshow</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Arial', sans-serif;
+            background-color: #000;
+            color: #fff;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+        }
+        
+        .slideshow-container {
+            width: 100%;
+            height: 100%;
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .word-display {
+            font-size: 8vw;
+            font-weight: bold;
+            text-align: center;
+            position: absolute;
+            opacity: 0;
+            transition: opacity 1s ease-in-out;
+            text-shadow: 0 0 10px rgba(255, 255, 255, 0.7);
+        }
+        
+        .word-display.active {
+            opacity: 1;
+        }
+        
+        .controls {
+            position: fixed;
+            bottom: 20px;
+            left: 0;
+            right: 0;
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            z-index: 100;
+        }
+        
+        button {
+            padding: 10px 20px;
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: 1px solid white;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        button:hover {
+            background: rgba(255, 255, 255, 0.4);
+        }
+        
+        .input-panel {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.9);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 200;
+            padding: 20px;
+        }
+        
+        .input-area {
+            width: 100%;
+            max-width: 600px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        
+        textarea {
+            width: 100%;
+            height: 200px;
+            padding: 15px;
+            font-size: 16px;
+            border-radius: 5px;
+            border: 1px solid #ccc;
+        }
+        
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="slideshow-container" id="slideshow">
+        <!-- The Words will be inserted here by JavaScript -->
+    </div>
+    
+    <div class="controls">
+        <button id="pauseBtn">Pause</button>
+        <button id="editBtn">Edit Words</button>
+    </div>
+    
+    <div class="input-panel" id="inputPanel">
+        <div class="input-area">
+            <h2 style="color: white; margin-bottom: 15px;">Enter Your Words (10-20 words)</h2>
+            <textarea id="wordsInput" placeholder="Enter your words here, separated by commas or new lines"></textarea>
+            <button id="startBtn">Start Slideshow</button>
+        </div>
+    </div>
+
+    <script>
+        // DOM elements
+        const slideshowContainer = document.getElementById('slideshow');
+        const pauseBtn = document.getElementById('pauseBtn');
+        const editBtn = document.getElementById('editBtn');
+        const inputPanel = document.getElementById('inputPanel');
+        const wordsInput = document.getElementById('wordsInput');
+        const startBtn = document.getElementById('startBtn');
+        
+        // Default words if none are provided
+        const defaultWords = [
+            "Creativity", "Imagination", "Innovation", "Inspiration", "Vision",
+            "Passion", "Dream", "Explore", "Discover", "Wonder",
+            "Adventure", "Curiosity", "Brilliance", "Wisdom", "Knowledge",
+            "Harmony", "Balance", "Serenity", "Peace", "Joy"
+        ];
+        
+        // Slideshow variables
+        let words = [];
+        let currentIndex = 0;
+        let intervalId = null;
+        let isPaused = false;
+        
+        // Initialize the slideshow
+        function initSlideshow() {
+            // Parse words from input or use defaults
+            const inputText = wordsInput.value.trim();
+            
+            if (inputText) {
+                // Split by commas or new lines, trim each word, and filter out empty strings
+                words = inputText.split(/[\n,]/)
+                                .map(word => word.trim())
+                                .filter(word => word.length > 0);
+                
+                // Validate word count
+                if (words.length < 10 || words.length > 20) {
+                    alert('Please enter between 10 and 20 words.');
+                    return;
+                }
+            } else {
+                // Use default words if no input
+                words = [...defaultWords].slice(0, 15); // Use first 15 default words
+            }
+            
+            // Clear previous slides
+            slideshowContainer.innerHTML = '';
+            
+            // Create word elements
+            words.forEach((word, index) => {
+                const wordElement = document.createElement('div');
+                wordElement.className = 'word-display';
+                wordElement.textContent = word;
+                wordElement.dataset.index = index;
+                slideshowContainer.appendChild(wordElement);
+            });
+            
+            // Hide input panel
+            inputPanel.classList.add('hidden');
+            
+            // Start slideshow
+            showNextWord();
+            startSlideshow();
+        }
+        
+        // Show the next word in the sequence
+        function showNextWord() {
+            // Hide all words
+            document.querySelectorAll('.word-display').forEach(word => {
+                word.classList.remove('active');
+            });
+            
+            // Show current word
+            const currentWord = document.querySelector(`.word-display[data-index="${currentIndex}"]`);
+            if (currentWord) {
+                currentWord.classList.add('active');
+            }
+            
+            // Update index for next word
+            currentIndex = (currentIndex + 1) % words.length;
+        }
+        
+        // Start the slideshow interval
+        function startSlideshow() {
+            if (intervalId) {
+                clearInterval(intervalId);
+            }
+            intervalId = setInterval(showNextWord, 5000); // 5 seconds per word
+            isPaused = false;
+            pauseBtn.textContent = 'Pause';
+        }
+        
+        // Pause or resume the slideshow
+        function togglePause() {
+            if (isPaused) {
+                startSlideshow();
+            } else {
+                clearInterval(intervalId);
+                intervalId = null;
+                isPaused = true;
+                pauseBtn.textContent = 'Resume';
+            }
+        }
+        
+        // Show the input panel to edit words
+        function showInputPanel() {
+            // Pause slideshow if running
+            if (intervalId) {
+                clearInterval(intervalId);
+                intervalId = null;
+            }
+            
+            // Update textarea with current words
+            wordsInput.value = words.join('\n');
+            
+            // Show input panel
+            inputPanel.classList.remove('hidden');
+        }
+        
+        // Event listeners
+        startBtn.addEventListener('click', initSlideshow);
+        pauseBtn.addEventListener('click', togglePause);
+        editBtn.addEventListener('click', showInputPanel);
+        
+        // Initialize with input panel visible
+        showInputPanel();
+    </script>
+</body>
+</html>
