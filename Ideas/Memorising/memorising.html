@@ -1,13 +1,15 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+
+
+<!--Author: Tanim Hossain -->
+    
     <meta charset="UTF-8">
-
-<!--Tanim Hossain -->
-
-  
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Memorising Slideshow</title>
+    <title>Memorizing Slideshow</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="icon" href="data:https://raw.githubusercontent.com/from-tanim/from-tanim.github.io/refs/heads/main/Ideas/Memorising/favicon.ico,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🧠</text></svg>">
     <style>
         * {
             margin: 0;
@@ -15,63 +17,161 @@
             box-sizing: border-box;
         }
         
+        :root {
+            --primary: #03a9f4;
+            --secondary: #0288d1;
+            --accent: #ff5722;
+            --light: #e3f2fd;
+            --dark: #01579b;
+            --transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        
         body {
-            font-family: 'Arial', sans-serif;
-            background-color: #03a9f4;
-            color: #fff;
-            height: 100vh;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--dark) 100%);
+            color: var(--light);
+            min-height: 100vh;
             display: flex;
             justify-content: center;
             align-items: center;
             overflow: hidden;
+            padding: 20px;
+        }
+        
+        .container {
+            width: 100%;
+            max-width: 1200px;
+            height: 90vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
         }
         
         .slideshow-container {
             width: 100%;
-            height: 100%;
+            height: 70%;
             position: relative;
             display: flex;
             justify-content: center;
             align-items: center;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 20px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            overflow: hidden;
+            margin-bottom: 20px;
         }
         
         .word-display {
-            font-size: 8vw;
+            font-size: clamp(2rem, 8vw, 6rem);
             font-weight: bold;
             text-align: center;
             position: absolute;
             opacity: 0;
-            transition: opacity 1s cubic-bezier(0.4, 0, 1, 1);
-            text-shadow: 0 0 10px rgba(255, 255, 255, 0.11);
+            transform: translateY(50px) scale(0.9);
+            transition: var(--transition);
+            text-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+            padding: 20px;
+            max-width: 90%;
         }
         
         .word-display.active {
             opacity: 1;
+            transform: translateY(0) scale(1);
+        }
+        
+        .progress-container {
+            width: 90%;
+            height: 8px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 10px;
+            margin-bottom: 20px;
+            overflow: hidden;
+        }
+        
+        .progress-bar {
+            height: 100%;
+            background: var(--accent);
+            width: 0%;
+            transition: width 0.3s linear;
+            border-radius: 10px;
         }
         
         .controls {
-            position: fixed;
-            bottom: 20px;
-            left: 0;
-            right: 0;
             display: flex;
             justify-content: center;
-            gap: 20px;
-            z-index: 100;
+            gap: 15px;
+            flex-wrap: wrap;
+            width: 90%;
+            margin-bottom: 20px;
         }
         
         button {
-            padding: 10px 20px;
+            padding: 12px 25px;
             background: rgba(255, 255, 255, 0.2);
             color: white;
-            border: 1px solid white;
-            border-radius: 5px;
+            border: none;
+            border-radius: 50px;
             cursor: pointer;
-            transition: all 0.3s;
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: 600;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
         }
         
         button:hover {
-            background: rgba(255, 255, 255, 0.4);
+            background: rgba(255, 255, 255, 0.3);
+            transform: translateY(-2px);
+        }
+        
+        button:active {
+            transform: translateY(0);
+        }
+        
+        button:focus {
+            outline: 2px solid white;
+        }
+        
+        .timer-controls {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-top: 10px;
+            background: rgba(255, 255, 255, 0.1);
+            padding: 10px 20px;
+            border-radius: 50px;
+        }
+        
+        .timer-controls span {
+            font-weight: 600;
+        }
+        
+        .timer-controls input {
+            width: 60px;
+            padding: 8px;
+            border: none;
+            border-radius: 20px;
+            text-align: center;
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+        }
+        
+        .timer-controls input:focus {
+            outline: 2px solid white;
+        }
+        
+        .counter {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.3);
+            padding: 8px 15px;
+            border-radius: 20px;
+            font-weight: 600;
+            backdrop-filter: blur(5px);
         }
         
         .input-panel {
@@ -87,45 +187,202 @@
             align-items: center;
             z-index: 200;
             padding: 20px;
+            backdrop-filter: blur(5px);
         }
         
         .input-area {
             width: 100%;
-            max-width: 600px;
+            max-width: 700px;
             display: flex;
             flex-direction: column;
-            gap: 15px;
+            gap: 20px;
+            background: rgba(255, 255, 255, 0.1);
+            padding: 30px;
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+        }
+        
+        .input-area h2 {
+            text-align: center;
+            margin-bottom: 10px;
+            color: var(--light);
         }
         
         textarea {
             width: 100%;
             height: 200px;
-            padding: 15px;
+            padding: 20px;
             font-size: 16px;
-            border-radius: 5px;
-            border: 1px solid #ccc;
+            border-radius: 15px;
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            background: rgba(0, 0, 0, 0.3);
+            color: white;
+            resize: vertical;
+        }
+        
+        textarea:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+        
+        .settings {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+        
+        .setting-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        
+        .setting-group label {
+            font-weight: 600;
         }
         
         .hidden {
             display: none;
         }
+        
+        .transition-select {
+            padding: 10px;
+            border-radius: 10px;
+            background: rgba(0, 0, 0, 0.3);
+            color: white;
+            border: 2px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .transition-select:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+        
+        @media (max-width: 768px) {
+            .controls {
+                flex-direction: column;
+                align-items: center;
+            }
+            
+            .timer-controls {
+                width: 100%;
+                justify-content: center;
+            }
+            
+            .settings {
+                flex-direction: column;
+            }
+        }
+        
+        /* Animation classes */
+        .zoom-in {
+            transform: scale(0.5) !important;
+        }
+        
+        .zoom-in.active {
+            transform: scale(1) !important;
+        }
+        
+        .slide-up {
+            transform: translateY(100px) !important;
+        }
+        
+        .slide-up.active {
+            transform: translateY(0) !important;
+        }
+        
+        .rotate {
+            transform: rotate(-10deg) scale(0.8) !important;
+        }
+        
+        .rotate.active {
+            transform: rotate(0) scale(1) !important;
+        }
+        
+        .flip {
+            transform: perspective(1000px) rotateX(90deg) !important;
+        }
+        
+        .flip.active {
+            transform: perspective(1000px) rotateX(0) !important;
+        }
     </style>
 </head>
 <body>
-    <div class="slideshow-container" id="slideshow">
-        <!-- The Words will be inserted here by JavaScript -->
-    </div>
-    
-    <div class="controls">
-        <button id="pauseBtn">Pause</button>
-        <button id="editBtn">Edit Words</button>
+    <div class="container">
+        <div class="slideshow-container" id="slideshow" role="region" aria-live="polite" aria-label="Word slideshow">
+            <!-- The Words will be inserted here by JavaScript -->
+            <div class="counter" id="counter" aria-live="off">0/0</div>
+        </div>
+        
+        <div class="progress-container">
+            <div class="progress-bar" id="progressBar"></div>
+        </div>
+        
+        <div class="controls">
+            <button id="prevBtn" aria-label="Previous word">
+                <i class="fas fa-arrow-left"></i> Previous
+            </button>
+            <button id="pauseBtn" aria-label="Pause slideshow">
+                <i class="fas fa-pause"></i> Pause
+            </button>
+            <button id="nextBtn" aria-label="Next word">
+                Next <i class="fas fa-arrow-right"></i>
+            </button>
+            <button id="editBtn" aria-label="Edit words">
+                <i class="fas fa-edit"></i> Edit Words
+            </button>
+            
+            <div class="timer-controls">
+                <span>Display time (s):</span>
+                <input type="number" id="displayTime" min="1" max="60" value="4" aria-label="Word display time in seconds">
+                <span>Repeat:</span>
+                <input type="number" id="repeatCount" min="0" value="0" aria-label="Number of times to repeat the slideshow">
+            </div>
+            
+            <select id="transitionSelect" class="transition-select" aria-label="Select transition effect">
+                <option value="fade">Fade</option>
+                <option value="zoom">Zoom</option>
+                <option value="slide">Slide Up</option>
+                <option value="rotate">Rotate</option>
+                <option value="flip">Flip</option>
+            </select>
+        </div>
     </div>
     
     <div class="input-panel" id="inputPanel">
         <div class="input-area">
-            <h2 style="color: white; margin-bottom: 15px;">Enter Your Words (10-20 words)</h2>
-            <textarea id="wordsInput" placeholder="Enter your words here, separated by commas or new lines"></textarea>
-            <button id="startBtn">Start Slideshow</button>
+            <h2>Enter Your Words</h2>
+            <textarea id="wordsInput" placeholder="Enter your words here, separated by commas or new lines. Any number of words is accepted."></textarea>
+            
+            <div class="settings">
+                <div class="setting-group">
+                    <label for="displayTimeInput">Display time (seconds):</label>
+                    <input type="number" id="displayTimeInput" min="1" max="60" value="4">
+                </div>
+                
+                <div class="setting-group">
+                    <label for="repeatInput">Repeat count (0 for no repeat):</label>
+                    <input type="number" id="repeatInput" min="0" value="0">
+                </div>
+                
+                <div class="setting-group">
+                    <label for="transitionInput">Transition effect:</label>
+                    <select id="transitionInput" class="transition-select">
+                        <option value="fade">Fade</option>
+                        <option value="zoom">Zoom</option>
+                        <option value="slide">Slide Up</option>
+                        <option value="rotate">Rotate</option>
+                        <option value="flip">Flip</option>
+                    </select>
+                </div>
+            </div>
+            
+            <button id="startBtn">
+                <i class="fas fa-play"></i> Start Slideshow
+            </button>
         </div>
     </div>
 
@@ -133,27 +390,43 @@
         // DOM elements
         const slideshowContainer = document.getElementById('slideshow');
         const pauseBtn = document.getElementById('pauseBtn');
+        const prevBtn = document.getElementById('prevBtn');
+        const nextBtn = document.getElementById('nextBtn');
         const editBtn = document.getElementById('editBtn');
         const inputPanel = document.getElementById('inputPanel');
         const wordsInput = document.getElementById('wordsInput');
         const startBtn = document.getElementById('startBtn');
-        
-        // Default words if none are provided
-        const defaultWords = [
-            "Creativity", "Imagination", "Innovation", "Inspiration", "Vision",
-            "Passion", "Dream", "Explore", "Discover", "Wonder",
-            "Adventure", "Curiosity", "Brilliance", "Wisdom", "Knowledge",
-            "Harmony", "Balance", "Serenity", "Peace", "Joy"
-        ];
+        const progressBar = document.getElementById('progressBar');
+        const counter = document.getElementById('counter');
+        const displayTimeInput = document.getElementById('displayTimeInput');
+        const repeatInput = document.getElementById('repeatInput');
+        const transitionInput = document.getElementById('transitionInput');
+        const displayTimeControl = document.getElementById('displayTime');
+        const repeatCountControl = document.getElementById('repeatCount');
+        const transitionSelect = document.getElementById('transitionSelect');
         
         // Slideshow variables
         let words = [];
         let currentIndex = 0;
         let intervalId = null;
         let isPaused = false;
+        let displayTime = 4000; // 4 seconds default
+        let repeatCount = 0;
+        let currentRepeat = 0;
+        let transitionEffect = 'fade';
         
         // Initialize the slideshow
         function initSlideshow() {
+            // Get settings from input panel
+            displayTime = parseInt(displayTimeInput.value) * 1000;
+            repeatCount = parseInt(repeatInput.value);
+            transitionEffect = transitionInput.value;
+            
+            // Update controls with these values
+            displayTimeControl.value = displayTimeInput.value;
+            repeatCountControl.value = repeatInput.value;
+            transitionSelect.value = transitionEffect;
+            
             // Parse words from input or use defaults
             const inputText = wordsInput.value.trim();
             
@@ -162,15 +435,14 @@
                 words = inputText.split(/[\n,]/)
                                 .map(word => word.trim())
                                 .filter(word => word.length > 0);
-                
-                // Validate word count
-                if (words.length < 10 || words.length > 20) {
-                    alert('Please enter between 10 and 20 words.');
-                    return;
-                }
             } else {
                 // Use default words if no input
-                words = [...defaultWords].slice(0, 15); // Use first 15 default words
+                words = [
+                    "Creativity", "Imagination", "Innovation", "Inspiration", "Vision",
+                    "Passion", "Dream", "Explore", "Discover", "Wonder",
+                    "Adventure", "Curiosity", "Brilliance", "Wisdom", "Knowledge",
+                    "Harmony", "Balance", "Serenity", "Peace", "Joy"
+                ];
             }
             
             // Clear previous slides
@@ -182,32 +454,124 @@
                 wordElement.className = 'word-display';
                 wordElement.textContent = word;
                 wordElement.dataset.index = index;
+                wordElement.setAttribute('aria-hidden', 'true');
                 slideshowContainer.appendChild(wordElement);
             });
+            
+            // Add counter back
+            slideshowContainer.appendChild(counter);
+            
+            // Reset counters
+            currentIndex = 0;
+            currentRepeat = 0;
             
             // Hide input panel
             inputPanel.classList.add('hidden');
             
+            // Update progress and counter
+            updateProgress();
+            updateCounter();
+            
             // Start slideshow
-            showNextWord();
+            showCurrentWord();
             startSlideshow();
+            
+            // Set focus to the slideshow container for keyboard navigation
+            slideshowContainer.focus();
         }
         
-        // Show the next word in the sequence
-        function showNextWord() {
+        // Show the current word
+        function showCurrentWord() {
             // Hide all words
             document.querySelectorAll('.word-display').forEach(word => {
                 word.classList.remove('active');
+                word.className = 'word-display'; // Reset all classes
+                
+                // Add the selected transition effect class
+                switch(transitionEffect) {
+                    case 'zoom':
+                        word.classList.add('zoom-in');
+                        break;
+                    case 'slide':
+                        word.classList.add('slide-up');
+                        break;
+                    case 'rotate':
+                        word.classList.add('rotate');
+                        break;
+                    case 'flip':
+                        word.classList.add('flip');
+                        break;
+                    default:
+                        // Default is fade, no additional class needed
+                        break;
+                }
+                
+                word.setAttribute('aria-hidden', 'true');
             });
             
             // Show current word
             const currentWord = document.querySelector(`.word-display[data-index="${currentIndex}"]`);
             if (currentWord) {
                 currentWord.classList.add('active');
+                currentWord.setAttribute('aria-hidden', 'false');
             }
             
-            // Update index for next word
-            currentIndex = (currentIndex + 1) % words.length;
+            // Update progress and counter
+            updateProgress();
+            updateCounter();
+        }
+        
+        // Show the next word in the sequence
+        function showNextWord() {
+            currentIndex++;
+            
+            // Check if we've reached the end of the word list
+            if (currentIndex >= words.length) {
+                currentIndex = 0;
+                currentRepeat++;
+                
+                // Check if we've reached the repeat count
+                if (repeatCount > 0 && currentRepeat >= repeatCount) {
+                    clearInterval(intervalId);
+                    intervalId = null;
+                    showInputPanel();
+                    return;
+                }
+            }
+            
+            showCurrentWord();
+        }
+        
+        // Show the previous word
+        function showPrevWord() {
+            currentIndex--;
+            
+            // Check if we're at the beginning
+            if (currentIndex < 0) {
+                // If we're at the beginning and repeating is enabled, go to the end
+                if (repeatCount > 0 && currentRepeat > 0) {
+                    currentRepeat--;
+                    currentIndex = words.length - 1;
+                } else {
+                    currentIndex = 0;
+                }
+            }
+            
+            showCurrentWord();
+        }
+        
+        // Update progress bar
+        function updateProgress() {
+            const progress = ((currentIndex + 1) / words.length) * 100;
+            progressBar.style.width = `${progress}%`;
+        }
+        
+        // Update word counter
+        function updateCounter() {
+            counter.textContent = `${currentIndex + 1}/${words.length}`;
+            if (repeatCount > 0) {
+                counter.textContent += ` (Round ${currentRepeat + 1}/${repeatCount})`;
+            }
         }
         
         // Start the slideshow interval
@@ -215,9 +579,10 @@
             if (intervalId) {
                 clearInterval(intervalId);
             }
-            intervalId = setInterval(showNextWord, 5000); // 5 seconds per word
+            intervalId = setInterval(showNextWord, displayTime);
             isPaused = false;
-            pauseBtn.textContent = 'Pause';
+            pauseBtn.innerHTML = '<i class="fas fa-pause"></i> Pause';
+            pauseBtn.setAttribute('aria-label', 'Pause slideshow');
         }
         
         // Pause or resume the slideshow
@@ -228,7 +593,8 @@
                 clearInterval(intervalId);
                 intervalId = null;
                 isPaused = true;
-                pauseBtn.textContent = 'Resume';
+                pauseBtn.innerHTML = '<i class="fas fa-play"></i> Resume';
+                pauseBtn.setAttribute('aria-label', 'Resume slideshow');
             }
         }
         
@@ -243,17 +609,86 @@
             // Update textarea with current words
             wordsInput.value = words.join('\n');
             
+            // Update input fields with current settings
+            displayTimeInput.value = displayTime / 1000;
+            repeatInput.value = repeatCount;
+            transitionInput.value = transitionEffect;
+            
             // Show input panel
             inputPanel.classList.remove('hidden');
+        }
+        
+        // Update display time from control
+        function updateDisplayTime() {
+            const newTime = parseInt(displayTimeControl.value) * 1000;
+            if (newTime >= 1000 && newTime <= 60000) {
+                displayTime = newTime;
+                if (intervalId && !isPaused) {
+                    startSlideshow(); // Restart with new timing
+                }
+            }
+        }
+        
+        // Update repeat count from control
+        function updateRepeatCount() {
+            const newRepeat = parseInt(repeatCountControl.value);
+            if (newRepeat >= 0) {
+                repeatCount = newRepeat;
+            }
+        }
+        
+        // Update transition effect from control
+        function updateTransitionEffect() {
+            transitionEffect = transitionSelect.value;
+            showCurrentWord(); // Update with new transition
+        }
+        
+        // Handle keyboard navigation
+        function handleKeyDown(e) {
+            if (inputPanel.classList.contains('hidden')) {
+                switch(e.key) {
+                    case ' ':
+                        togglePause();
+                        e.preventDefault();
+                        break;
+                    case 'ArrowLeft':
+                        showPrevWord();
+                        if (intervalId && !isPaused) {
+                            startSlideshow(); // Restart interval
+                        }
+                        e.preventDefault();
+                        break;
+                    case 'ArrowRight':
+                        showNextWord();
+                        if (intervalId && !isPaused) {
+                            startSlideshow(); // Restart interval
+                        }
+                        e.preventDefault();
+                        break;
+                    case 'Escape':
+                        showInputPanel();
+                        e.preventDefault();
+                        break;
+                }
+            }
         }
         
         // Event listeners
         startBtn.addEventListener('click', initSlideshow);
         pauseBtn.addEventListener('click', togglePause);
+        prevBtn.addEventListener('click', showPrevWord);
+        nextBtn.addEventListener('click', showNextWord);
         editBtn.addEventListener('click', showInputPanel);
+        displayTimeControl.addEventListener('change', updateDisplayTime);
+        repeatCountControl.addEventListener('change', updateRepeatCount);
+        transitionSelect.addEventListener('change', updateTransitionEffect);
+        document.addEventListener('keydown', handleKeyDown);
         
         // Initialize with input panel visible
         showInputPanel();
+        
+        // Set focus to textarea when input panel is shown
+        wordsInput.focus();
     </script>
 </body>
 </html>
