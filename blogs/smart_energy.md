@@ -1,13 +1,13 @@
 # স্মার্ট এনার্জি ইকোসিস্টেম: সবুজ পৃথিবীর প্রকৌশল
 
-**লেখক:** তানিম হোছাইন [ FEC পুরকৌশল '১৩]
+ তানিম হোছাইন [ FEC পুরকৌশল '১৩]
 
 জলবায়ু পরিবর্তন এবং ক্রমবর্ধমান জ্বালানি সংকটের এই যুগে পৃথিবীকে বাঁচাতে এবং রূপান্তরের এই সময়ে প্রচলিত জ্বালানির পথ ছেড়ে আমাদের টেকসই ও পরিবেশবান্ধব প্রযুক্তির দিকে এগিয়ে যেতেই হবে। এই পুরো ব্যবস্থার প্রাণকেন্দ্র হলো **"স্মার্ট এনার্জি ইকোসিস্টেম"**। একদিকে এটি পরিচ্ছন্ন শক্তি বাড়ায়, অন্যদিকে কৃত্রিম বুদ্ধিমত্তা ও প্রকৌশলের সংযোগে বিদ্যুৎ খাতকে করে তোলে সম্পূর্ণ নিখুঁত ও অপচয়মুক্ত।
 
 আধুনিক শক্তি ব্যবস্থার রূপরেখা বুঝতে স্মার্ট এনার্জি ইকোসিস্টেমের মূল উপাদান ও এর কার্যকর পরিচালনা প্রক্রিয়ার বিস্তারিত বিবরণ নিচে দেওয়া হলো:
 
 ---
-![DIAG - 1](https://raw.githubusercontent.com/from-tanim/from-tanim.github.io/refs/heads/main/Assets/10329609fd3942ebad514211970d4a8e.jpg)
+![DIAG - 1](https://raw.githubusercontent.com/from-tanim/from-tanim.github.io/refs/heads/main/Assets/fig-01.jpg)
 
 ## ১. ডিজিটাল অবকাঠামো ও এআই (Digital Infrastructure & AI) — *বাম পাশের চক্র*
 
@@ -45,7 +45,7 @@
 
 ---
 
-![DIAG - 02 ](https://raw.githubusercontent.com/from-tanim/from-tanim.github.io/refs/heads/main/Assets/494eac67fac54262b0db997d74567acb.jpg)
+![DIAG - 02 ](https://raw.githubusercontent.com/from-tanim/from-tanim.github.io/refs/heads/main/Assets/fig-02.png)
 
 > **প্রযুক্তির ছোঁয়ায় সুষম ও টেকসই জ্বালানি ব্যবস্থাপনা**  
 > *(Unified & Sustainable Energy Management with Technological Touch)*
