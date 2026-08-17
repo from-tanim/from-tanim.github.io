@@ -1322,377 +1322,1140 @@
 
     <script>
         // ============================================
-        // CONFIGURATION - CHANGE THESE VALUES
-        // ============================================
-        const GITHUB_USERNAME = 'from-tanim';
-        const GITHUB_REPO = 'from-tanim.github.io'; // Your repository name
-        const BLOG_FOLDER = 'blogs'; // The folder where your Markdown files are stored
+// CONFIGURATION
+// ============================================
+const CONFIG = {
+    GITHUB_USERNAME: 'from-tanim',
+    GITHUB_REPO: 'from-tanim.github.io',
+    BLOG_FOLDER: 'blogs',
+    POSTS_PER_PAGE: 6,
+    CACHE_DURATION: 5 * 60 * 1000, // 5 minutes
+    ANIMATION_DELAY: 0.1
+};
 
-        // ============================================
-        // BLOG SYSTEM
-        // ============================================
-        const blogListView = document.getElementById('blogListView');
-        const blogPostView = document.getElementById('blogPostView');
-        const blogGrid = document.getElementById('blogGrid');
-        const blogPostContent = document.getElementById('blogPostContent');
-        const backToBlogs = document.getElementById('backToBlogs');
-        let allPosts = [];
+// ============================================
+// BLOG SYSTEM - ENHANCED
+// ============================================
+class BlogSystem {
+    constructor() {
+        this.posts = [];
+        this.currentPage = 1;
+        this.totalPages = 1;
+        this.currentFilter = 'all';
+        this.searchQuery = '';
+        this.isLoading = false;
+        
+        this.initializeElements();
+        this.initializeMarkdown();
+        this.bindEvents();
+        this.loadPosts();
+    }
 
-        // Configure marked.js for safe rendering
+    initializeElements() {
+        this.elements = {
+            blogListView: document.getElementById('blogListView'),
+            blogPostView: document.getElementById('blogPostView'),
+            blogGrid: document.getElementById('blogGrid'),
+            blogPostContent: document.getElementById('blogPostContent'),
+            backToBlogs: document.getElementById('backToBlogs'),
+            searchInput: document.getElementById('blogSearch'),
+            categoryFilter: document.getElementById('categoryFilter'),
+            pagination: document.getElementById('pagination'),
+            loadingIndicator: document.getElementById('loadingIndicator'),
+            errorContainer: document.getElementById('errorContainer'),
+            readingProgress: document.getElementById('readingProgress')
+        };
+    }
+
+    initializeMarkdown() {
         if (typeof marked !== 'undefined') {
             marked.setOptions({
                 breaks: true,
                 gfm: true,
                 headerIds: true,
-                mangle: false
+                mangle: false,
+                highlight: function(code, lang) {
+                    if (typeof hljs !== 'undefined' && lang && hljs.getLanguage(lang)) {
+                        return hljs.highlight(code, { language: lang }).value;
+                    }
+                    return code;
+                }
             });
         }
+    }
 
-        // Fetch blog posts from GitHub API
-        async function fetchBlogPosts() {
-            try {
-                const apiUrl = `https://api.github.com/repos/${GITHUB_USERNAME}/${GITHUB_REPO}/contents/${BLOG_FOLDER}`;
-                const response = await fetch(apiUrl);
+    bindEvents() {
+        // Back button
+        this.elements.backToBlogs?.addEventListener('click', () => this.showBlogList());
+        
+        // Search
+        this.elements.searchInput?.addEventListener('input', this.debounce(() => {
+            this.searchQuery = this.elements.searchInput.value;
+            this.currentPage = 1;
+            this.renderBlogList();
+        }, 300));
 
-                if (!response.ok) {
-                    throw new Error(`GitHub API returned ${response.status}`);
-                }
-
-                const files = await response.json();
-
-                // Filter for .md files only
-                const mdFiles = files.filter(file =>
-                    file.name.endsWith('.md') && file.type === 'file'
-                );
-
-                if (mdFiles.length === 0) {
-                    showEmptyState();
-                    return;
-                }
-
-                // Fetch content of each markdown file
-                const postPromises = mdFiles.map(async (file) => {
-                    try {
-                        const contentResponse = await fetch(file.download_url);
-                        const markdown = await contentResponse.text();
-
-                        // Parse frontmatter-like metadata from first lines
-                        const metadata = extractMetadata(markdown, file);
-
-                        return {
-                            ...metadata,
-                            filename: file.name,
-                            rawUrl: file.download_url,
-                            sha: file.sha
-                        };
-                    } catch (err) {
-                        console.error(`Failed to fetch ${file.name}:`, err);
-                        return null;
-                    }
-                });
-
-                allPosts = (await Promise.all(postPromises)).filter(post => post !== null);
-
-                // Sort by date (newest first)
-                allPosts.sort((a, b) => new Date(b.date) - new Date(a.date));
-
-                renderBlogList(allPosts);
-            } catch (error) {
-                console.error('Error fetching blog posts:', error);
-                showErrorState(error);
-            }
-        }
-
-        // Extract metadata from markdown content
-        function extractMetadata(markdown, file) {
-            const lines = markdown.split('\n');
-            let title = '';
-            let date = '';
-            let excerpt = '';
-            let contentStartIndex = 0;
-
-            // Check for YAML-like frontmatter
-            if (lines[0] && lines[0].trim() === '---') {
-                for (let i = 1; i < lines.length; i++) {
-                    if (lines[i].trim() === '---') {
-                        contentStartIndex = i + 1;
-                        break;
-                    }
-                    const colonIndex = lines[i].indexOf(':');
-                    if (colonIndex > 0) {
-                        const key = lines[i].substring(0, colonIndex).trim().toLowerCase();
-                        const value = lines[i].substring(colonIndex + 1).trim();
-                        if (key === 'title') title = value;
-                        if (key === 'date') date = value;
-                        if (key === 'excerpt' || key === 'description') excerpt = value;
-                    }
-                }
-            }
-
-            // If no frontmatter title, use first # heading
-            if (!title) {
-                for (let i = contentStartIndex; i < lines.length; i++) {
-                    const headingMatch = lines[i].match(/^#\s+(.+)/);
-                    if (headingMatch) {
-                        title = headingMatch[1];
-                        contentStartIndex = Math.max(contentStartIndex, i + 1);
-                        break;
-                    }
-                }
-            }
-
-            // Fallback title: use filename without extension
-            if (!title) {
-                title = file.name.replace('.md', '').replace(/[-_]/g, ' ');
-            }
-
-            // If no date, use file's last commit date (we'll use today as fallback)
-            if (!date) {
-                date = new Date().toISOString().split('T')[0];
-            }
-
-            // Generate excerpt if not provided
-            if (!excerpt) {
-                const contentLines = lines.slice(contentStartIndex);
-                const textContent = contentLines
-                    .filter(line => !line.startsWith('#') && !line.startsWith('![') && line.trim() !== '')
-                    .join(' ')
-                    .replace(/[#*`\[\]()]/g, '')
-                    .trim();
-                excerpt = textContent.substring(0, 180) + '...';
-            }
-
-            return {
-                title: title.trim(),
-                date: date.trim(),
-                excerpt: excerpt.trim(),
-                markdown: markdown,
-                contentStartIndex: contentStartIndex
-            };
-        }
-
-        // Render the blog list
-        function renderBlogList(posts) {
-            blogGrid.innerHTML = '';
-
-            posts.forEach((post, index) => {
-                const card = document.createElement('div');
-                card.className = 'blog-list-card fade-in';
-                card.style.animationDelay = `${index * 0.1}s`;
-                card.onclick = () => showBlogPost(post);
-
-                const formattedDate = formatDate(post.date);
-
-                card.innerHTML = `
-                    <div class="blog-list-info">
-                        <h3>${escapeHtml(post.title)}</h3>
-                        <div class="blog-list-meta">
-                            <span>📅 ${formattedDate}</span>
-                            <span>📄 ${post.filename}</span>
-                        </div>
-                        <p style="color: var(--text-muted); font-size: 0.9rem; margin-top: 8px;">${escapeHtml(post.excerpt)}</p>
-                    </div>
-                    <div class="blog-list-arrow">→</div>
-                `;
-
-                blogGrid.appendChild(card);
-            });
-        }
-
-        // Show a single blog post
-        function showBlogPost(post) {
-            blogListView.style.display = 'none';
-            blogPostView.classList.add('active');
-
-            const formattedDate = formatDate(post.date);
-            const htmlContent = marked.parse(post.markdown);
-
-            blogPostContent.innerHTML = `
-                <h1>${escapeHtml(post.title)}</h1>
-                <span class="post-date">📅 ${formattedDate}</span>
-                <div class="markdown-body">${htmlContent}</div>
-            `;
-
-            // Scroll to the blog section
-            document.getElementById('blog').scrollIntoView({ behavior: 'smooth' });
-
-            // Update URL hash
-            window.location.hash = `blog/${post.filename.replace('.md', '')}`;
-        }
-
-        // Go back to blog list
-        backToBlogs.addEventListener('click', () => {
-            blogPostView.classList.remove('active');
-            blogListView.style.display = 'block';
-            window.location.hash = 'blog';
+        // Category filter
+        this.elements.categoryFilter?.addEventListener('change', (e) => {
+            this.currentFilter = e.target.value;
+            this.currentPage = 1;
+            this.renderBlogList();
         });
 
-        // Show empty state when no blog posts found
-        function showEmptyState() {
-            blogGrid.innerHTML = `
-                <div class="blog-empty-state fade-in">
-                    <div class="empty-icon">📝</div>
-                    <h3>No Blog Posts Yet</h3>
-                    <p>Add <code>.md</code> files to the <code>${BLOG_FOLDER}/</code> folder in your GitHub repository, and they'll appear here automatically!</p>
-                    <br>
-                    <p style="font-size: 0.85rem; color: var(--text-muted);">
-                        Example structure:<br>
-                        <code style="background: var(--surface-light); padding: 4px 8px; border-radius: 4px;">blogs/my-first-post.md</code>
-                    </p>
-                </div>
-            `;
-        }
-
-        // Show error state
-        function showErrorState(error) {
-            blogGrid.innerHTML = `
-                <div class="blog-empty-state fade-in">
-                    <div class="empty-icon">⚠️</div>
-                    <h3>Couldn't Load Blog Posts</h3>
-                    <p style="color: var(--text-muted);">${escapeHtml(error.message)}</p>
-                    <br>
-                    <p style="font-size: 0.85rem;">Make sure your repository is public and the <code>${BLOG_FOLDER}/</code> folder exists.</p>
-                    <p style="font-size: 0.85rem;">
-                        <a href="https://github.com/${GITHUB_USERNAME}/${GITHUB_REPO}" target="_blank" rel="noopener" style="color: var(--accent);">
-                            Check your repo →
-                        </a>
-                    </p>
-                </div>
-            `;
-        }
-
-        // Utility: Format date string
-        function formatDate(dateStr) {
-            try {
-                const date = new Date(dateStr);
-                if (isNaN(date.getTime())) return dateStr;
-                return date.toLocaleDateString('en-US', {
-                    year: 'numeric',
-                    month: 'long',
-                    day: 'numeric'
-                });
-            } catch {
-                return dateStr;
+        // Keyboard navigation
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && this.elements.blogPostView?.classList.contains('active')) {
+                this.showBlogList();
             }
+        });
+
+        // Hash change for deep linking
+        window.addEventListener('hashchange', () => this.handleDeepLink());
+    }
+
+    async loadPosts() {
+        this.showLoading();
+        
+        try {
+            // Try cache first
+            const cached = this.getCachedPosts();
+            if (cached) {
+                this.posts = cached;
+                this.renderBlogList();
+                this.hideLoading();
+                this.handleDeepLink();
+                return;
+            }
+
+            // Fetch from GitHub API
+            await this.fetchPostsFromGitHub();
+            
+            // Cache the results
+            this.cachePosts(this.posts);
+            
+            this.renderBlogList();
+            this.hideLoading();
+            this.handleDeepLink();
+        } catch (error) {
+            console.error('Failed to load blog posts:', error);
+            this.showError(error);
+        }
+    }
+
+    async fetchPostsFromGitHub() {
+        const apiUrl = `https://api.github.com/repos/${CONFIG.GITHUB_USERNAME}/${CONFIG.GITHUB_REPO}/contents/${CONFIG.BLOG_FOLDER}`;
+        
+        const response = await fetch(apiUrl, {
+            headers: {
+                'Accept': 'application/vnd.github.v3+json'
+            }
+        });
+
+        if (!response.ok) {
+            throw new Error(`GitHub API returned ${response.status}: ${response.statusText}`);
         }
 
-        // Utility: Escape HTML
-        function escapeHtml(text) {
-            const div = document.createElement('div');
-            div.textContent = text;
-            return div.innerHTML;
+        const files = await response.json();
+        const mdFiles = files.filter(file => 
+            file.name.endsWith('.md') && file.type === 'file'
+        );
+
+        if (mdFiles.length === 0) {
+            this.showEmptyState();
+            return;
         }
 
-        // Initialize blog on page load
-        fetchBlogPosts();
+        const postPromises = mdFiles.map(async (file) => {
+            try {
+                const contentResponse = await fetch(file.download_url);
+                if (!contentResponse.ok) {
+                    throw new Error(`Failed to fetch ${file.name}`);
+                }
+                const markdown = await contentResponse.text();
+                return this.parsePost(markdown, file);
+            } catch (err) {
+                console.error(`Failed to process ${file.name}:`, err);
+                return null;
+            }
+        });
 
-        // Handle direct URL to a blog post
-        function handleBlogDeepLink() {
-            const hash = window.location.hash;
-            if (hash.startsWith('#blog/') && allPosts.length > 0) {
-                const slug = hash.replace('#blog/', '');
-                const post = allPosts.find(p => p.filename.replace('.md', '') === slug);
-                if (post) {
-                    showBlogPost(post);
+        this.posts = (await Promise.all(postPromises))
+            .filter(post => post !== null)
+            .sort((a, b) => new Date(b.date) - new Date(a.date));
+    }
+
+    parsePost(markdown, file) {
+        const metadata = this.extractMetadata(markdown, file);
+        const categories = this.extractCategories(metadata);
+        const tags = this.extractTags(metadata);
+        const readTime = this.calculateReadTime(markdown);
+
+        return {
+            ...metadata,
+            filename: file.name,
+            slug: file.name.replace('.md', ''),
+            rawUrl: file.download_url,
+            sha: file.sha,
+            categories,
+            tags,
+            readTime,
+            markdown
+        };
+    }
+
+    extractMetadata(markdown, file) {
+        const lines = markdown.split('\n');
+        let metadata = {
+            title: '',
+            date: '',
+            excerpt: '',
+            author: CONFIG.GITHUB_USERNAME,
+            categories: [],
+            tags: []
+        };
+        
+        let contentStartIndex = 0;
+
+        // Parse YAML frontmatter
+        if (lines[0]?.trim() === '---') {
+            for (let i = 1; i < lines.length; i++) {
+                if (lines[i].trim() === '---') {
+                    contentStartIndex = i + 1;
+                    break;
+                }
+                
+                const colonIndex = lines[i].indexOf(':');
+                if (colonIndex > 0) {
+                    const key = lines[i].substring(0, colonIndex).trim().toLowerCase();
+                    const value = lines[i].substring(colonIndex + 1).trim();
+                    
+                    switch(key) {
+                        case 'title': metadata.title = value; break;
+                        case 'date': metadata.date = value; break;
+                        case 'excerpt':
+                        case 'description': metadata.excerpt = value; break;
+                        case 'author': metadata.author = value; break;
+                        case 'categories':
+                            metadata.categories = value.split(',').map(c => c.trim());
+                            break;
+                        case 'tags':
+                            metadata.tags = value.split(',').map(t => t.trim());
+                            break;
+                    }
                 }
             }
         }
 
-        // Check for deep links after posts load
-        const originalFetch = fetchBlogPosts;
-        fetchBlogPosts = async function() {
-            await originalFetch();
-            handleBlogDeepLink();
+        // Extract from content if no frontmatter
+        if (!metadata.title) {
+            for (let i = contentStartIndex; i < lines.length; i++) {
+                const headingMatch = lines[i].match(/^#\s+(.+)/);
+                if (headingMatch) {
+                    metadata.title = headingMatch[1];
+                    contentStartIndex = Math.max(contentStartIndex, i + 1);
+                    break;
+                }
+            }
+        }
+
+        // Fallbacks
+        if (!metadata.title) {
+            metadata.title = file.name.replace('.md', '').replace(/[-_]/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+        }
+        
+        if (!metadata.date) {
+            metadata.date = new Date().toISOString().split('T')[0];
+        }
+
+        if (!metadata.excerpt) {
+            const contentLines = lines.slice(contentStartIndex);
+            const textContent = contentLines
+                .filter(line => !line.startsWith('#') && !line.startsWith('![') && line.trim() !== '')
+                .join(' ')
+                .replace(/[#*`\[\]()]/g, '')
+                .trim();
+            metadata.excerpt = textContent.substring(0, 200) + '...';
+        }
+
+        return {
+            ...metadata,
+            contentStartIndex
+        };
+    }
+
+    extractCategories(metadata) {
+        if (metadata.categories?.length) return metadata.categories;
+        
+        // Try to extract from markdown
+        const categoryMatch = metadata.markdown.match(/#category:\s*(.+)/i);
+        if (categoryMatch) {
+            return categoryMatch[1].split(',').map(c => c.trim());
+        }
+        
+        return ['uncategorized'];
+    }
+
+    extractTags(metadata) {
+        if (metadata.tags?.length) return metadata.tags;
+        
+        // Try to extract from markdown
+        const tagsMatch = metadata.markdown.match(/#tags:\s*(.+)/i);
+        if (tagsMatch) {
+            return tagsMatch[1].split(',').map(t => t.trim());
+        }
+        
+        return [];
+    }
+
+    calculateReadTime(markdown) {
+        const wordsPerMinute = 200;
+        const words = markdown.replace(/[#*`\[\]()]/g, '').split(/\s+/).length;
+        return Math.max(1, Math.ceil(words / wordsPerMinute));
+    }
+
+    renderBlogList() {
+        const filteredPosts = this.getFilteredPosts();
+        this.totalPages = Math.ceil(filteredPosts.length / CONFIG.POSTS_PER_PAGE);
+        
+        const startIndex = (this.currentPage - 1) * CONFIG.POSTS_PER_PAGE;
+        const endIndex = startIndex + CONFIG.POSTS_PER_PAGE;
+        const pagePosts = filteredPosts.slice(startIndex, endIndex);
+
+        this.elements.blogGrid.innerHTML = '';
+
+        if (pagePosts.length === 0) {
+            this.showNoResults();
+            return;
+        }
+
+        pagePosts.forEach((post, index) => {
+            const card = this.createBlogCard(post, index);
+            this.elements.blogGrid.appendChild(card);
+        });
+
+        this.renderPagination();
+        this.updateCategoryFilter();
+    }
+
+    createBlogCard(post, index) {
+        const card = document.createElement('article');
+        card.className = 'blog-card fade-in';
+        card.style.animationDelay = `${index * CONFIG.ANIMATION_DELAY}s`;
+        
+        const formattedDate = this.formatDate(post.date);
+        
+        card.innerHTML = `
+            <div class="blog-card-header">
+                <div class="blog-card-categories">
+                    ${post.categories.map(cat => `<span class="category-tag">${this.escapeHtml(cat)}</span>`).join('')}
+                </div>
+                <h3 class="blog-card-title">${this.escapeHtml(post.title)}</h3>
+            </div>
+            <div class="blog-card-meta">
+                <span>📅 ${formattedDate}</span>
+                <span>⏱️ ${post.readTime} min read</span>
+                ${post.author ? `<span>✍️ ${this.escapeHtml(post.author)}</span>` : ''}
+            </div>
+            <p class="blog-card-excerpt">${this.escapeHtml(post.excerpt)}</p>
+            <div class="blog-card-footer">
+                <div class="blog-card-tags">
+                    ${post.tags.slice(0, 3).map(tag => `<span class="tag">#${this.escapeHtml(tag)}</span>`).join('')}
+                </div>
+                <button class="read-more-btn" onclick="blogSystem.showBlogPost('${post.slug}')">
+                    Read More →
+                </button>
+            </div>
+        `;
+        
+        return card;
+    }
+
+    showBlogPost(slug) {
+        const post = this.posts.find(p => p.slug === slug);
+        if (!post) return;
+
+        this.elements.blogListView.style.display = 'none';
+        this.elements.blogPostView.classList.add('active');
+
+        const formattedDate = this.formatDate(post.date);
+        const htmlContent = marked.parse(post.markdown);
+
+        this.elements.blogPostContent.innerHTML = `
+            <article class="blog-post">
+                <header class="blog-post-header">
+                    <div class="blog-post-categories">
+                        ${post.categories.map(cat => `<span class="category-tag">${this.escapeHtml(cat)}</span>`).join('')}
+                    </div>
+                    <h1 class="blog-post-title">${this.escapeHtml(post.title)}</h1>
+                    <div class="blog-post-meta">
+                        <span>📅 ${formattedDate}</span>
+                        <span>⏱️ ${post.readTime} min read</span>
+                        ${post.author ? `<span>✍️ ${this.escapeHtml(post.author)}</span>` : ''}
+                    </div>
+                </header>
+                <div class="markdown-body">${htmlContent}</div>
+                <footer class="blog-post-footer">
+                    <div class="blog-post-tags">
+                        ${post.tags.map(tag => `<span class="tag">#${this.escapeHtml(tag)}</span>`).join('')}
+                    </div>
+                    <button class="share-btn" onclick="blogSystem.sharePost('${post.slug}')">
+                        🔗 Share
+                    </button>
+                </footer>
+            </article>
+        `;
+
+        // Add syntax highlighting
+        if (typeof hljs !== 'undefined') {
+            this.elements.blogPostContent.querySelectorAll('pre code').forEach(block => {
+                hljs.highlightElement(block);
+            });
+        }
+
+        // Scroll to top of post
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        
+        // Update URL
+        window.location.hash = `blog/${post.slug}`;
+        
+        // Track reading progress
+        this.initializeReadingProgress();
+    }
+
+    showBlogList() {
+        this.elements.blogPostView.classList.remove('active');
+        this.elements.blogListView.style.display = 'block';
+        window.location.hash = 'blog';
+        this.renderBlogList();
+    }
+
+    getFilteredPosts() {
+        let filtered = [...this.posts];
+
+        // Apply category filter
+        if (this.currentFilter !== 'all') {
+            filtered = filtered.filter(post => 
+                post.categories.includes(this.currentFilter)
+            );
+        }
+
+        // Apply search
+        if (this.searchQuery) {
+            const query = this.searchQuery.toLowerCase();
+            filtered = filtered.filter(post => 
+                post.title.toLowerCase().includes(query) ||
+                post.excerpt.toLowerCase().includes(query) ||
+                post.tags.some(tag => tag.toLowerCase().includes(query)) ||
+                post.categories.some(cat => cat.toLowerCase().includes(query))
+            );
+        }
+
+        return filtered;
+    }
+
+    updateCategoryFilter() {
+        if (!this.elements.categoryFilter) return;
+        
+        const categories = new Set();
+        this.posts.forEach(post => {
+            post.categories.forEach(cat => categories.add(cat));
+        });
+
+        const currentValue = this.elements.categoryFilter.value;
+        this.elements.categoryFilter.innerHTML = `
+            <option value="all">All Categories</option>
+            ${[...categories].sort().map(cat => 
+                `<option value="${this.escapeHtml(cat)}">${this.escapeHtml(cat)}</option>`
+            ).join('')}
+        `;
+        this.elements.categoryFilter.value = currentValue || 'all';
+    }
+
+    renderPagination() {
+        if (!this.elements.pagination || this.totalPages <= 1) {
+            if (this.elements.pagination) this.elements.pagination.innerHTML = '';
+            return;
+        }
+
+        let paginationHTML = '';
+        
+        // Previous button
+        paginationHTML += `
+            <button class="page-btn" ${this.currentPage === 1 ? 'disabled' : ''} 
+                    onclick="blogSystem.goToPage(${this.currentPage - 1})">
+                ←
+            </button>
+        `;
+
+        // Page numbers
+        for (let i = 1; i <= this.totalPages; i++) {
+            if (
+                i === 1 || 
+                i === this.totalPages || 
+                (i >= this.currentPage - 2 && i <= this.currentPage + 2)
+            ) {
+                paginationHTML += `
+                    <button class="page-btn ${i === this.currentPage ? 'active' : ''}" 
+                            onclick="blogSystem.goToPage(${i})">
+                        ${i}
+                    </button>
+                `;
+            } else if (i === this.currentPage - 3 || i === this.currentPage + 3) {
+                paginationHTML += '<span class="page-dots">...</span>';
+            }
+        }
+
+        // Next button
+        paginationHTML += `
+            <button class="page-btn" ${this.currentPage === this.totalPages ? 'disabled' : ''} 
+                    onclick="blogSystem.goToPage(${this.currentPage + 1})">
+                →
+            </button>
+        `;
+
+        this.elements.pagination.innerHTML = paginationHTML;
+    }
+
+    goToPage(page) {
+        if (page < 1 || page > this.totalPages) return;
+        this.currentPage = page;
+        this.renderBlogList();
+        this.elements.blogGrid.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    initializeReadingProgress() {
+        const progressBar = this.elements.readingProgress;
+        if (!progressBar) return;
+
+        const updateProgress = () => {
+            const scrollTop = window.scrollY;
+            const docHeight = document.documentElement.scrollHeight - window.innerHeight;
+            const progress = (scrollTop / docHeight) * 100;
+            progressBar.style.width = `${progress}%`;
         };
 
-        // Re-check when hash changes
-        window.addEventListener('hashchange', () => {
-            if (allPosts.length > 0) {
-                handleBlogDeepLink();
-            }
-        });
+        window.addEventListener('scroll', updateProgress);
+        updateProgress();
+    }
 
-        // ============================================
-        // NAVIGATION
-        // ============================================
-        const navbar = document.getElementById('navbar');
+    sharePost(slug) {
+        const url = window.location.href;
+        if (navigator.share) {
+            navigator.share({
+                title: 'Check out this blog post',
+                url: url
+            }).catch(console.error);
+        } else {
+            navigator.clipboard.writeText(url).then(() => {
+                this.showToast('Link copied to clipboard!');
+            });
+        }
+    }
+
+    showToast(message) {
+        const toast = document.createElement('div');
+        toast.className = 'toast';
+        toast.textContent = message;
+        document.body.appendChild(toast);
+        
+        setTimeout(() => {
+            toast.classList.add('show');
+        }, 100);
+        
+        setTimeout(() => {
+            toast.classList.remove('show');
+            setTimeout(() => toast.remove(), 300);
+        }, 3000);
+    }
+
+    handleDeepLink() {
+        const hash = window.location.hash;
+        if (hash.startsWith('#blog/') && this.posts.length > 0) {
+            const slug = hash.replace('#blog/', '');
+            const post = this.posts.find(p => p.slug === slug);
+            if (post) {
+                this.showBlogPost(slug);
+            }
+        }
+    }
+
+    getCachedPosts() {
+        try {
+            const cached = localStorage.getItem('blogPosts');
+            const timestamp = localStorage.getItem('blogPostsTimestamp');
+            
+            if (cached && timestamp) {
+                const age = Date.now() - parseInt(timestamp);
+                if (age < CONFIG.CACHE_DURATION) {
+                    return JSON.parse(cached);
+                }
+            }
+        } catch (error) {
+            console.warn('Failed to read cache:', error);
+        }
+        return null;
+    }
+
+    cachePosts(posts) {
+        try {
+            localStorage.setItem('blogPosts', JSON.stringify(posts));
+            localStorage.setItem('blogPostsTimestamp', Date.now().toString());
+        } catch (error) {
+            console.warn('Failed to cache posts:', error);
+        }
+    }
+
+    showLoading() {
+        if (this.elements.loadingIndicator) {
+            this.elements.loadingIndicator.style.display = 'block';
+        }
+        if (this.elements.errorContainer) {
+            this.elements.errorContainer.style.display = 'none';
+        }
+    }
+
+    hideLoading() {
+        if (this.elements.loadingIndicator) {
+            this.elements.loadingIndicator.style.display = 'none';
+        }
+    }
+
+    showEmptyState() {
+        this.hideLoading();
+        this.elements.blogGrid.innerHTML = `
+            <div class="blog-empty-state fade-in">
+                <div class="empty-icon">📝</div>
+                <h3>No Blog Posts Yet</h3>
+                <p>Add <code>.md</code> files to the <code>${CONFIG.BLOG_FOLDER}/</code> folder in your GitHub repository, and they'll appear here automatically!</p>
+                <br>
+                <div class="example-structure">
+                    <p>Example structure:</p>
+                    <pre><code>blogs/
+├── first-post.md
+├── second-post.md
+└── category/
+    └── third-post.md</code></pre>
+                </div>
+                <button class="btn btn-primary" onclick="window.open('https://github.com/${CONFIG.GITHUB_USERNAME}/${CONFIG.GITHUB_REPO}/new/main/${CONFIG.BLOG_FOLDER}', '_blank')">
+                    Create Your First Post →
+                </button>
+            </div>
+        `;
+    }
+
+    showNoResults() {
+        this.elements.blogGrid.innerHTML = `
+            <div class="blog-empty-state fade-in">
+                <div class="empty-icon">🔍</div>
+                <h3>No Posts Found</h3>
+                <p>Try adjusting your search or filter criteria.</p>
+            </div>
+        `;
+    }
+
+    showError(error) {
+        this.hideLoading();
+        if (this.elements.errorContainer) {
+            this.elements.errorContainer.innerHTML = `
+                <div class="error-message">
+                    <strong>⚠️ Error loading blog posts</strong>
+                    <p>${this.escapeHtml(error.message)}</p>
+                    <button class="btn btn-secondary" onclick="blogSystem.loadPosts()">
+                        Try Again
+                    </button>
+                </div>
+            `;
+            this.elements.errorContainer.style.display = 'block';
+        }
+    }
+
+    formatDate(dateStr) {
+        try {
+            const date = new Date(dateStr);
+            if (isNaN(date.getTime())) return dateStr;
+            
+            return date.toLocaleDateString('en-US', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+            });
+        } catch {
+            return dateStr;
+        }
+    }
+
+    escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    debounce(func, wait) {
+        let timeout;
+        return function executedFunction(...args) {
+            const later = () => {
+                clearTimeout(timeout);
+                func(...args);
+            };
+            clearTimeout(timeout);
+            timeout = setTimeout(later, wait);
+        };
+    }
+}
+
+// ============================================
+// INITIALIZE BLOG SYSTEM
+// ============================================
+let blogSystem;
+
+document.addEventListener('DOMContentLoaded', () => {
+    blogSystem = new BlogSystem();
+});
+
+// ============================================
+// NAVIGATION SYSTEM - ENHANCED
+// ============================================
+class NavigationSystem {
+    constructor() {
+        this.navbar = document.getElementById('navbar');
+        this.mobileMenuBtn = document.getElementById('mobileMenuBtn');
+        this.navLinks = document.getElementById('navLinks');
+        this.sections = document.querySelectorAll('.section');
+        this.navAnchors = document.querySelectorAll('.nav-links a');
+        
+        this.initialize();
+        this.bindEvents();
+    }
+
+    initialize() {
+        // Add scroll progress bar
+        this.createScrollProgress();
+        
+        // Initialize active section
+        this.setActiveLink();
+    }
+
+    createScrollProgress() {
+        const progressBar = document.createElement('div');
+        progressBar.className = 'scroll-progress';
+        progressBar.id = 'scrollProgress';
+        document.body.appendChild(progressBar);
+        
+        window.addEventListener('scroll', () => {
+            const scrollTop = window.scrollY;
+            const docHeight = document.documentElement.scrollHeight - window.innerHeight;
+            const progress = (scrollTop / docHeight) * 100;
+            progressBar.style.width = `${progress}%`;
+        });
+    }
+
+    bindEvents() {
+        // Navbar scroll effect
         window.addEventListener('scroll', () => {
             if (window.scrollY > 50) {
-                navbar.classList.add('scrolled');
+                this.navbar?.classList.add('scrolled');
             } else {
-                navbar.classList.remove('scrolled');
+                this.navbar?.classList.remove('scrolled');
             }
         });
 
         // Mobile menu toggle
-        const mobileMenuBtn = document.getElementById('mobileMenuBtn');
-        const navLinks = document.getElementById('navLinks');
-        mobileMenuBtn.addEventListener('click', () => {
-            navLinks.classList.toggle('active');
+        this.mobileMenuBtn?.addEventListener('click', () => {
+            this.navLinks?.classList.toggle('active');
+            this.mobileMenuBtn?.classList.toggle('active');
         });
 
-        navLinks.querySelectorAll('a').forEach(link => {
+        // Close mobile menu on link click
+        this.navLinks?.querySelectorAll('a').forEach(link => {
             link.addEventListener('click', () => {
-                navLinks.classList.remove('active');
+                this.navLinks?.classList.remove('active');
+                this.mobileMenuBtn?.classList.remove('active');
             });
         });
 
-        // Active nav link on scroll
-        const sections = document.querySelectorAll('.section');
-        const navAnchors = document.querySelectorAll('.nav-links a');
-
-        function setActiveLink() {
-            let current = '';
-            sections.forEach(section => {
-                const sectionTop = section.offsetTop - 100;
-                if (window.scrollY >= sectionTop) {
-                    current = section.getAttribute('id');
+        // Smooth scroll for anchor links
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', (e) => {
+                const href = anchor.getAttribute('href');
+                if (href === '#') return;
+                
+                e.preventDefault();
+                const target = document.querySelector(href);
+                if (target) {
+                    target.scrollIntoView({ behavior: 'smooth' });
                 }
             });
-            navAnchors.forEach(anchor => {
-                anchor.classList.remove('active');
-                if (anchor.getAttribute('href') === '#' + current) {
-                    anchor.classList.add('active');
-                }
-            });
-        }
-        window.addEventListener('scroll', setActiveLink);
+        });
 
+        // Active link on scroll with throttle
+        let ticking = false;
+        window.addEventListener('scroll', () => {
+            if (!ticking) {
+                window.requestAnimationFrame(() => {
+                    this.setActiveLink();
+                    ticking = false;
+                });
+                ticking = true;
+            }
+        });
+    }
+
+    setActiveLink() {
+        let current = '';
+        const scrollPosition = window.scrollY + 150;
+
+        this.sections.forEach(section => {
+            const sectionTop = section.offsetTop;
+            if (scrollPosition >= sectionTop) {
+                current = section.getAttribute('id');
+            }
+        });
+
+        this.navAnchors.forEach(anchor => {
+            anchor.classList.remove('active');
+            if (anchor.getAttribute('href') === '#' + current) {
+                anchor.classList.add('active');
+            }
+        });
+    }
+}
+
+// ============================================
+// CONTACT FORM SYSTEM - ENHANCED
+// ============================================
+class ContactFormSystem {
+    constructor() {
+        this.form = document.getElementById('contactForm');
+        this.feedback = document.getElementById('formFeedback');
+        this.submitBtn = document.getElementById('submitBtn');
         
-        // CONTACT FORM
-       
-        function handleSubmit(event) {
-            event.preventDefault();
-            const feedback = document.getElementById('formFeedback');
-            feedback.style.display = 'block';
-            feedback.style.color = '#4da6ff';
-            feedback.textContent = "Thanks for your message! I'll get back to you soon. (Demo form — connect to Formspree for production)";
-            event.target.reset();
+        this.initialize();
+    }
+
+    initialize() {
+        if (!this.form) return;
+        
+        this.form.addEventListener('submit', (e) => this.handleSubmit(e));
+        
+        // Real-time validation
+        const inputs = this.form.querySelectorAll('input, textarea');
+        inputs.forEach(input => {
+            input.addEventListener('input', () => this.validateField(input));
+            input.addEventListener('blur', () => this.validateField(input));
+        });
+    }
+
+    async handleSubmit(event) {
+        event.preventDefault();
+        
+        if (!this.validateForm()) return;
+        
+        const formData = new FormData(this.form);
+        const data = Object.fromEntries(formData.entries());
+        
+        // Show loading state
+        this.setLoading(true);
+        
+        try {
+            // Simulate API call (replace with actual Formspree endpoint)
+            await this.simulateApiCall(data);
+            this.showSuccess('Thanks for your message! I\'ll get back to you soon.');
+            this.form.reset();
+        } catch (error) {
+            this.showError('Something went wrong. Please try again.');
+        } finally {
+            this.setLoading(false);
+        }
+    }
+
+    simulateApiCall(data) {
+        return new Promise((resolve, reject) => {
             setTimeout(() => {
-                feedback.style.display = 'none';
+                console.log('Form data:', data);
+                resolve();
+            }, 1500);
+        });
+    }
+
+    validateField(input) {
+        const value = input.value.trim();
+        let isValid = true;
+        let errorMessage = '';
+
+        switch(input.type) {
+            case 'email':
+                const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                isValid = emailRegex.test(value);
+                errorMessage = 'Please enter a valid email address';
+                break;
+            case 'text':
+                isValid = value.length >= 2;
+                errorMessage = 'This field is required';
+                break;
+            case 'textarea':
+                isValid = value.length >= 10;
+                errorMessage = 'Message should be at least 10 characters';
+                break;
+        }
+
+        if (!isValid) {
+            this.showFieldError(input, errorMessage);
+        } else {
+            this.clearFieldError(input);
+        }
+
+        return isValid;
+    }
+
+    validateForm() {
+        const inputs = this.form.querySelectorAll('input, textarea');
+        let isValid = true;
+        
+        inputs.forEach(input => {
+            if (!this.validateField(input)) {
+                isValid = false;
+            }
+        });
+
+        return isValid;
+    }
+
+    showFieldError(input, message) {
+        input.classList.add('error');
+        const errorElement = input.parentElement.querySelector('.error-message') 
+            || this.createErrorElement(input);
+        errorElement.textContent = message;
+        errorElement.style.display = 'block';
+    }
+
+    clearFieldError(input) {
+        input.classList.remove('error');
+        const errorElement = input.parentElement.querySelector('.error-message');
+        if (errorElement) {
+            errorElement.style.display = 'none';
+        }
+    }
+
+    createErrorElement(input) {
+        const errorElement = document.createElement('span');
+        errorElement.className = 'error-message';
+        input.parentElement.appendChild(errorElement);
+        return errorElement;
+    }
+
+    setLoading(isLoading) {
+        if (this.submitBtn) {
+            this.submitBtn.disabled = isLoading;
+            this.submitBtn.innerHTML = isLoading 
+                ? '<span class="spinner"></span> Sending...' 
+                : 'Send Message';
+        }
+    }
+
+    showSuccess(message) {
+        if (this.feedback) {
+            this.feedback.className = 'feedback success';
+            this.feedback.textContent = message;
+            this.feedback.style.display = 'block';
+            
+            setTimeout(() => {
+                this.feedback.style.display = 'none';
             }, 5000);
         }
+    }
 
-        // ============================================
-        // ANIMATIONS
-        // ============================================
-        const observerOptions = {
+    showError(message) {
+        if (this.feedback) {
+            this.feedback.className = 'feedback error';
+            this.feedback.textContent = message;
+            this.feedback.style.display = 'block';
+            
+            setTimeout(() => {
+                this.feedback.style.display = 'none';
+            }, 5000);
+        }
+    }
+}
+
+// ============================================
+// ANIMATION SYSTEM - ENHANCED
+// ============================================
+class AnimationSystem {
+    constructor() {
+        this.initializeObservers();
+        this.initializeTypeWriter();
+        this.initializeParallax();
+    }
+
+    initializeObservers() {
+        const fadeInOptions = {
             threshold: 0.15,
             rootMargin: '0px 0px -50px 0px'
         };
 
-        const observer = new IntersectionObserver((entries) => {
+        const fadeInObserver = new IntersectionObserver((entries) => {
             entries.forEach(entry => {
                 if (entry.isIntersecting) {
                     entry.target.style.opacity = '1';
                     entry.target.style.transform = 'translateY(0)';
+                    fadeInObserver.unobserve(entry.target);
                 }
             });
-        }, observerOptions);
+        }, fadeInOptions);
 
-        document.querySelectorAll('.fade-in, .project-card, .resume-block, .blog-list-card').forEach(el => {
-            observer.observe(el);
+        document.querySelectorAll('.fade-in, .project-card, .resume-block, .blog-card').forEach(el => {
+            fadeInObserver.observe(el);
         });
+
+        // Counter animation for stats
+        const counterObserver = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    this.animateCounter(entry.target);
+                    counterObserver.unobserve(entry.target);
+                }
+            });
+        }, { threshold: 0.5 });
+
+        document.querySelectorAll('.counter').forEach(el => {
+            counterObserver.observe(el);
+        });
+    }
+
+    animateCounter(element) {
+        const target = parseInt(element.getAttribute('data-target'));
+        const duration = 2000;
+        const startTime = performance.now();
+
+        const updateCounter = (currentTime) => {
+            const elapsed = currentTime - startTime;
+            const progress = Math.min(elapsed / duration, 1);
+            const easedProgress = 1 - Math.pow(1 - progress, 3);
+            const currentValue = Math.floor(easedProgress * target);
+            
+            element.textContent = currentValue.toLocaleString();
+            
+            if (progress < 1) {
+                requestAnimationFrame(updateCounter);
+            }
+        };
+
+        requestAnimationFrame(updateCounter);
+    }
+
+    initializeTypeWriter() {
+        const typeWriterElements = document.querySelectorAll('.typewriter');
+        
+        typeWriterElements.forEach(element => {
+            const text = element.getAttribute('data-text');
+            if (!text) return;
+            
+            element.textContent = '';
+            let index = 0;
+            
+            const typeWriter = () => {
+                if (index < text.length) {
+                    element.textContent += text.charAt(index);
+                    index++;
+                    setTimeout(typeWriter, 50);
+                }
+            };
+            
+            typeWriter();
+        });
+    }
+
+    initializeParallax() {
+        const parallaxElements = document.querySelectorAll('.parallax');
+        
+        window.addEventListener('scroll', () => {
+            parallaxElements.forEach(element => {
+                const speed = element.getAttribute('data-speed') || 0.5;
+                const scrollY = window.scrollY;
+                const offset = scrollY * speed;
+                element.style.transform = `translateY(${offset}px)`;
+            });
+        });
+    }
+}
+
+// ============================================
+// THEME SYSTEM
+// ============================================
+class ThemeSystem {
+    constructor() {
+        this.theme = localStorage.getItem('theme') || 'dark';
+        this.initialize();
+    }
+
+    initialize() {
+        this.applyTheme();
+        this.createThemeToggle();
+    }
+
+    applyTheme() {
+        document.documentElement.setAttribute('data-theme', this.theme);
+        localStorage.setItem('theme', this.theme);
+    }
+
+    toggleTheme() {
+        this.theme = this.theme === 'dark' ? 'light' : 'dark';
+        this.applyTheme();
+    }
+
+    createThemeToggle() {
+        const toggle = document.createElement('button');
+        toggle.className = 'theme-toggle';
+        toggle.innerHTML = this.theme === 'dark' ? '🌙' : '☀️';
+        toggle.setAttribute('aria-label', 'Toggle theme');
+        
+        toggle.addEventListener('click', () => {
+            this.toggleTheme();
+            toggle.innerHTML = this.theme === 'dark' ? '🌙' : '☀️';
+        });
+        
+        document.body.appendChild(toggle);
+    }
+}
+
+// ============================================
+// INITIALIZE ALL SYSTEMS
+// ============================================
+document.addEventListener('DOMContentLoaded', () => {
+    // Initialize navigation
+    const navigation = new NavigationSystem();
+    
+    // Initialize contact form
+    const contactForm = new ContactFormSystem();
+    
+    // Initialize animations
+    const animations = new AnimationSystem();
+    
+    // Initialize theme
+    const theme = new ThemeSystem();
+    
+    // Initialize blog system
+    blogSystem = new BlogSystem();
+    
+    // Handle keyboard shortcuts
+    document.addEventListener('keydown', (e) => {
+        // Ctrl/Cmd + K for search focus
+        if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+            e.preventDefault();
+            const searchInput = document.getElementById('blogSearch');
+            searchInput?.focus();
+        }
+        
+        // Ctrl/Cmd + / for theme toggle
+        if ((e.ctrlKey || e.metaKey) && e.key === '/') {
+            e.preventDefault();
+            theme.toggleTheme();
+        }
+    });
+});
+
+// Export for global access
+window.blogSystem = blogSystem;
     </script>
 </body>
 </html>
